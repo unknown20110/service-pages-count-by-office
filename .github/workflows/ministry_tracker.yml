@@ -1,0 +1,46 @@
+# .github/workflows/ministry_tracker.yml
+name: Ministry Services Tracker
+
+on:
+  schedule:
+    # רץ כל יום ב-8:00 UTC (11:00 ישראל בחורף, 10:00 בקיץ)
+    - cron: '0 8 * * *'
+  workflow_dispatch: # אפשרות להפעלה ידנית
+
+jobs:
+  track-services:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install requests gspread google-auth google-auth-oauthlib google-auth-httplib2
+    
+    - name: Run ministry tracker
+      run: |
+        python complete_ministries_tracker.py --output ministry_data_temp.csv --quiet
+    
+    - name: Upload to Google Sheets
+      env:
+        GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+        GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+      run: |
+        python upload_to_sheets.py
+    
+    - name: Commit and push if changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        if [[ -n $(git status --porcelain) ]]; then
+          git add .
+          git commit -m "Update ministry data $(date +'%Y-%m-%d %H:%M')"
+          git push
+        fi
