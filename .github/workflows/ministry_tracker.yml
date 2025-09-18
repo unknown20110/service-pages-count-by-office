@@ -23,16 +23,9 @@ jobs:
     - name: Install dependencies
       run: |
         pip install requests gspread google-auth google-auth-oauthlib google-auth-httplib2
-        
-    - name: Set UTF-8 encoding
-      run: |
-        export LANG=en_US.UTF-8
-        export LC_ALL=en_US.UTF-8
     
     - name: Run ministry tracker
       run: |
-        ls -la
-        pwd
         python complete_ministries_tracker.py --output ministry_data_temp.csv --quiet
     
     - name: Upload to Google Sheets
