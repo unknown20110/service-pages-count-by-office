@@ -238,6 +238,12 @@ class CompleteMinistriesTracker:
         
         try:
             response = self.session.get(url, params=params, timeout=10)
+
+             # DEBUG: הדפסה לבדיקה
+            if dept_id == "ba3bf87e-6a99-4e24-ae89-2815a450881e":  # רק עבור המשרד הראשון
+                print(f"DEBUG - URL: {url}")
+                print(f"DEBUG - Status: {response.status_code}")
+                print(f"DEBUG - Response: {response.text[:200]}...")
             
             if response.status_code == 200:
                 data = response.json()
