@@ -1,8 +1,11 @@
-name: Ministry Services Tracker - Fixed
+# .github/workflows/ministry_tracker.yml
+name: Ministry Services Tracker
+
 on:
   schedule:
-    - cron: '0 8 * * *'  # תוקן - הוספתי כוכבית חסרה
-  workflow_dispatch:
+    # רץ כל יום ב-8:00 UTC (11:00 ישראל בחורף, 10:00 בקיץ)
+    - cron: '0 8 * * *'
+  workflow_dispatch: # אפשרות להפעלה ידנית
 
 jobs:
   track-services:
@@ -13,7 +16,7 @@ jobs:
       uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v5  # עודכן לגרסה החדשה
+      uses: actions/setup-python@v4
       with:
         python-version: '3.11'
     
@@ -21,62 +24,16 @@ jobs:
       run: |
         pip install requests gspread google-auth google-auth-oauthlib google-auth-httplib2
     
-    # בדיקת חיבור לאתר הממשלתי
-    - name: Test government site connection
+    - name: Run ministry tracker
       run: |
-        echo "Testing connection to gov.il..."
-        curl -I https://www.gov.il/he/api/GeneralApi/GetModel || echo "Connection failed"
-        curl -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -I https://www.gov.il/he/api/GeneralApi/GetModel || echo "Connection with headers failed"
-    
-    # ריצה עם דיבאגינג מלא
-    - name: Run ministry tracker with full debugging
-      run: |
-        echo "Starting ministry tracker..."
-        python -u complete_ministries_tracker.py --output ministry_data_temp.csv --sample 5 2>&1 | tee tracker_log.txt
-        echo "Tracker completed. Checking output file..."
-        if [ -f ministry_data_temp.csv ]; then
-          echo "CSV file created successfully"
-          echo "First few lines of CSV:"
-          head -5 ministry_data_temp.csv
-          echo "CSV file size: $(wc -l < ministry_data_temp.csv) lines"
-        else
-          echo "ERROR: CSV file was not created!"
-          exit 1
-        fi
-    
-    - name: Display tracker logs
-      if: always()
-      run: |
-        echo "=== TRACKER LOGS ==="
-        cat tracker_log.txt || echo "No tracker log found"
-        echo "=== END LOGS ==="
+        python complete_ministries_tracker.py --output ministry_data_temp.csv --quiet
     
     - name: Upload to Google Sheets
       env:
         GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
         GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
       run: |
-        echo "Starting Google Sheets upload..."
-        python -u upload_to_sheets.py 2>&1 | tee upload_log.txt
-        echo "Upload completed"
-    
-    - name: Display upload logs
-      if: always()
-      run: |
-        echo "=== UPLOAD LOGS ==="
-        cat upload_log.txt || echo "No upload log found"
-        echo "=== END LOGS ==="
-    
-    - name: Upload logs as artifacts
-      uses: actions/upload-artifact@v4  # עודכן לגרסה החדשה
-      if: always()
-      with:
-        name: logs-${{ github.run_number }}
-        path: |
-          tracker_log.txt
-          upload_log.txt
-          ministry_data_temp.csv
-        retention-days: 30
+        python upload_to_sheets.py
     
     - name: Commit and push if changes
       run: |
