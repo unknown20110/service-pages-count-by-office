@@ -251,7 +251,7 @@ class CompleteMinistriesTracker:
     def scan_department(self, dept_id: str, dept_name: str) -> dict:
         """סריקת משרד יחיד"""
         
-        measurement_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+        measurement_date = datetime.now().strftime("%B %d, %Y")
         
         dept_data = {
             'תאריך_מדידה': measurement_date,
