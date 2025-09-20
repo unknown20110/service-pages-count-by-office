@@ -19,6 +19,13 @@ class CompleteMinistriesTracker:
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'he-IL,he;q=0.9,en;q=0.8',
         })
+
+         # הוספת headers נוספים לחיקוי דפדפן
+        self.session.headers.update({
+            'Referer': 'https://www.gov.il/',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Cache-Control': 'no-cache'
+        })
         
         # השפות לבדיקה
         self.languages = ['he', 'ar', 'en', 'es', 'fr', 'ru']
@@ -237,7 +244,7 @@ class CompleteMinistriesTracker:
         }
         
         try:
-            response = self.session.get(url, params=params, timeout=10)
+            response = self.session.get(url, params=params, timeout=30)
 
              # DEBUG: הדפסה לבדיקה
             if dept_id == "ba3bf87e-6a99-4e24-ae89-2815a450881e":  # רק עבור המשרד הראשון
