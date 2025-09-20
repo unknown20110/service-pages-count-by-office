@@ -8,17 +8,42 @@ Complete Ministries Tracker
 import requests
 import csv
 import time
+import json
 from datetime import datetime
 import argparse
 
 class CompleteMinistriesTracker:
     def __init__(self):
         self.session = requests.Session()
+        
+        # שינוי ה-headers להיות יותר אמינים
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'he-IL,he;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'DNT': '1',
+            'Referer': 'https://www.gov.il/',
+            'Origin': 'https://www.gov.il'
         })
+        
+        # הוספת retry mechanism
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+        
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+        )
+        
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
         
         # השפות לבדיקה
         self.languages = ['he', 'ar', 'en', 'es', 'fr', 'ru']
@@ -31,7 +56,7 @@ class CompleteMinistriesTracker:
             'ru': 'רוסית'
         }
         
-        # רשימה מלאה של כל המשרדים והיחידות (מהקובץ שלך)
+        # רשימה מלאה של כל המשרדים והיחידות
         self.departments = [
             ("ba3bf87e-6a99-4e24-ae89-2815a450881e", "משרד הכלכלה והתעשייה"),
             ("63e7fa42-b4f5-4f28-bf80-6cae59ed55d9", "אגף א' לקידום אוכלוסיות הלהט\"ב"),
@@ -237,16 +262,35 @@ class CompleteMinistriesTracker:
         }
         
         try:
-            response = self.session.get(url, params=params, timeout=10)
+            print(f"    בודק {language}... ", end="", flush=True)
+            response = self.session.get(url, params=params, timeout=15)
+            
+            print(f"Status: {response.status_code}", end=" ")
             
             if response.status_code == 200:
-                data = response.json()
-                return data.get('totalResults', 0)
+                try:
+                    data = response.json()
+                    count = data.get('totalResults', 0)
+                    print(f"-> {count}")
+                    return count
+                except json.JSONDecodeError as e:
+                    print(f"-> JSON Error: {e}")
+                    print(f"Response content: {response.text[:200]}")
+                    return 0
+            else:
+                print(f"-> HTTP Error: {response.status_code}")
+                print(f"Response: {response.text[:200]}")
+                return 0
                 
-        except Exception:
-            pass
-            
-        return 0
+        except requests.exceptions.Timeout:
+            print("-> Timeout")
+            return 0
+        except requests.exceptions.ConnectionError as e:
+            print(f"-> Connection Error: {e}")
+            return 0
+        except Exception as e:
+            print(f"-> Error: {e}")
+            return 0
 
     def scan_department(self, dept_id: str, dept_name: str) -> dict:
         """סריקת משרד יחיד"""
@@ -260,14 +304,26 @@ class CompleteMinistriesTracker:
         }
         
         total_services = 0
+        successful_requests = 0
+        
+        print(f"  בדיקת שפות:")
         
         for lang in self.languages:
             count = self.get_services_count(dept_id, lang)
             dept_data[self.language_names[lang]] = count
             total_services += count
-            time.sleep(0.1)
+            
+            if count > 0:
+                successful_requests += 1
+                
+            time.sleep(0.5)  # המתנה ארוכה יותר
         
         dept_data['סה_כ'] = total_services
+        
+        # אזהרה אם לא הצלחנו לקבל תוצאות
+        if total_services == 0 and successful_requests == 0:
+            print(f"  ⚠️  אזהרה: לא התקבלו תוצאות עבור {dept_name}")
+        
         return dept_data
 
     def scan_all(self, sample_size: int = None) -> list:
