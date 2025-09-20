@@ -115,7 +115,7 @@ class SheetsUploader:
                 end_row = start_row + len(new_data) - 1
                 range_name = f'A{start_row}:J{end_row}'
                 
-                worksheet.update(range_name, new_data, value_input_option='RAW')
+                worksheet.update(range_name, new_data, value_input_option='USER_ENTERED')
                 
                 print(f"✅ הועלו בהצלחה {len(new_data)} שורות")
                 print(f"📊 טווח מעודכן: {range_name}")
