@@ -1,11 +1,8 @@
-# .github/workflows/ministry_tracker.yml
-name: Ministry Services Tracker
-
+name: Ministry Services Tracker - Improved
 on:
   schedule:
-    # רץ כל יום ב-8:00 UTC (11:00 ישראל בחורף, 10:00 בקיץ)
     - cron: '0 8 * * *'
-  workflow_dispatch: # אפשרות להפעלה ידנית
+  workflow_dispatch:
 
 jobs:
   track-services:
@@ -24,16 +21,61 @@ jobs:
       run: |
         pip install requests gspread google-auth google-auth-oauthlib google-auth-httplib2
     
-    - name: Run ministry tracker
+    # בדיקת חיבור לאתר הממשלתי
+    - name: Test government site connection
       run: |
-        python complete_ministries_tracker.py --output ministry_data_temp.csv --quiet
+        echo "Testing connection to gov.il..."
+        curl -I https://www.gov.il/he/api/GeneralApi/GetModel || echo "Connection failed"
+        curl -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -I https://www.gov.il/he/api/GeneralApi/GetModel || echo "Connection with headers failed"
+    
+    # ריצה עם דיבאגינג מלא
+    - name: Run ministry tracker with full debugging
+      run: |
+        echo "Starting ministry tracker..."
+        python -u complete_ministries_tracker.py --output ministry_data_temp.csv --sample 5 2>&1 | tee tracker_log.txt
+        echo "Tracker completed. Checking output file..."
+        if [ -f ministry_data_temp.csv ]; then
+          echo "CSV file created successfully"
+          echo "First few lines of CSV:"
+          head -5 ministry_data_temp.csv
+          echo "CSV file size: $(wc -l < ministry_data_temp.csv) lines"
+        else
+          echo "ERROR: CSV file was not created!"
+          exit 1
+        fi
+    
+    - name: Display tracker logs
+      if: always()
+      run: |
+        echo "=== TRACKER LOGS ==="
+        cat tracker_log.txt
+        echo "=== END LOGS ==="
     
     - name: Upload to Google Sheets
       env:
         GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
         GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
       run: |
-        python upload_to_sheets.py
+        echo "Starting Google Sheets upload..."
+        python -u upload_to_sheets.py 2>&1 | tee upload_log.txt
+        echo "Upload completed"
+    
+    - name: Display upload logs
+      if: always()
+      run: |
+        echo "=== UPLOAD LOGS ==="
+        cat upload_log.txt
+        echo "=== END LOGS ==="
+    
+    - name: Upload logs as artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: logs
+        path: |
+          tracker_log.txt
+          upload_log.txt
+          ministry_data_temp.csv
     
     - name: Commit and push if changes
       run: |
